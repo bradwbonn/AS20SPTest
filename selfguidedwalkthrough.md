@@ -201,7 +201,13 @@ If an application requires the Windows operating system to restart, let it do so
 ### Enable user home folders
 #### In order for your users to have a persistent storage available to their application, you can utilize native home folders via an S3 bucket, Google Drive for G Suite, or OneDrive for Business.  To get your users online as quickly as possible with storage for them to consume, we're going to walk through setting up native Home Folders for your AppStream 2.0 Stack.
 
-Navigate to the AppStream 2.0 console, select **Stacks** then choose the stack we have created using the CloudFormation template.  Navigate to the **Storage** tab below the list of stacks, and turn on the **Enable Home Folders** check box.  You will see the name of an S3 bucket that has been created on your behalf by AppStream 2.0 for use in this purpose.
+Navigate to the AppStream 2.0 console, select **Stacks** then choose the stack we have created using the CloudFormation template.  
+
+Navigate to the **Storage** tab below the list of stacks, and turn on the **Enable Home Folders** check box.  
+
+You will see the name of an S3 bucket that has been created on your behalf by AppStream 2.0 for use in this purpose.
+
+When your users log in, they will now see two locations to save files within their applications.  One is temporary storage that does not persist between sessions, and the other is a home folder which will retain data saved to it between sessions.
 
 ### Clean-up
 #### Finally, stop your running image builders to free up resources and avoid unintended charges to your account. We recommend stopping any unused, running image builders. For more information, see [AppStream 2.0 Pricing.](https://aws.amazon.com/appstream2/pricing/)
@@ -255,7 +261,7 @@ You will see an area appear below which will allow you to upload your logo, add 
 You can log in as your test user again after refreshing the browser, and you should now see your chosen branding on the AppStream 2.0 page.
 
 ## Adding production users to your stack with User Pools
-#### AppStream 2.0 User Pools can accommodate up to 50 users by default. This quota can be increased by opening a support ticket, however for deployments involving 100 users or more, it is highly recommended to implement SAML 2.0 authentication to an external identity provider (IdP) for user management.
+#### AppStream 2.0 User Pools can accommodate up to 50 users by default. This quota can be increased by opening a support ticket, however for deployments involving 100 users or more, it is highly recommended to implement SAML 2.0 authentication to an external identity provider (IdP) for user management.  **For setting up SAML 2.0 federation, skip the step outlined below and follow the directions [in this guide](https://docs.aws.amazon.com/appstream2/latest/developerguide/external-identity-providers-setting-up-saml.html) for the specific identity provider you are using.**
 
 Your first user was created for you by the CloudFormation template, but now you will need to add additional users to your pool so they can stream your application(s).  This is done in the AppStream 2.0 console under **User Pool**.  
 
@@ -267,5 +273,5 @@ Once the users are created, select the checkboxes next to each of the new users 
 
 Choose the stack you've created in the previous steps from the pull-down menu, and assign them using the **Assign Stack** button.  The users will now see the application(s) you've configured into the stack's catalog when they log in.
 
-### Congratulations!  
+## Congratulations!  
 #### You have now deployed a custom application for use by the users in your User Pool, and they can now access it by streaming from anywhere with an Internet connection.  You can also share the login link provided in the welcome email via internal channels.
