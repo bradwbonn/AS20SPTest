@@ -1,0 +1,515 @@
+
+Description:  This template creates some of the basic components needed for a
+  deployment of AppStream 2.0, and the associated AWS-side VPC and networking.
+  This template creates a stack with a VPC, a pair of public and private subnets
+  spread across two Availability Zones, an AppStream Image Builder, stack,
+  fleet, and fleet association. It also deploys an internet gateway with a
+  default route on the public subnets. It deploys a pair of NAT gateways
+  (one in each AZ), and default routes for them in the private subnets. The
+  AppStream 2.0 fleet launches inside the private subnet behind the NAT gateways
+  to enable internet access without granting each session a public IP address.
+  After the stack is deployed, the Image Builder can be used to create a custom
+  image, and the fleet can be updated to utilize this new image, rather than the
+  base (blank) Windows image.  The template also creates an S3 bucket that can
+  be accessed by AppStream 2.0 for storing software installers to be used with
+  the Image Builder
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: AppStreamEUCStandardPlay
+    AllowedPattern: ^[A-Za-z0-9]+$
+
+  SoftwareS3BucketName:
+    Description: Globally-unique DNS name for S3 bucket for storing software to install via Image Builder
+    Type: String
+    Default: appstreamstandardplaysoftwareinstallers123456789
+    AllowedPattern: ^[a-z][a-z0-9\-]+$
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.192.0.0/16
+    AllowedPattern: ^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{2}$
+
+  PublicSubnet1CIDR:
+    Description: IP range (CIDR notation) for AZ1 public subnet (for NAT gateway)
+    Type: String
+    Default: 10.192.10.0/24
+    AllowedPattern: ^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{2}$
+
+  PublicSubnet2CIDR:
+    Description: IP range (CIDR notation) for AZ2 public subnet (for NAT gateway)
+    Type: String
+    Default: 10.192.11.0/24
+    AllowedPattern: ^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{2}$
+
+  PrivateSubnet1CIDR:
+    Description: IP range (CIDR notation) for AZ1 private subnet (fleet)
+    Type: String
+    Default: 10.192.20.0/24
+    AllowedPattern: ^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{2}$
+
+  PrivateSubnet2CIDR:
+    Description: IP range (CIDR notation) for AZ2 private subnet (fleet)
+    Type: String
+    Default: 10.192.21.0/24
+    AllowedPattern: ^(?:[0-9]{1,3}\.){3}[0-9]{1,3}\/[0-9]{2}$
+
+  FleetInstanceType:
+    Description: The instance type to use when launching both fleet and image builder instances
+    Type: String
+    Default: stream.standard.medium
+    AllowedValues:
+      - stream.standard.medium
+      - stream.standard.large
+      - stream.compute.large
+      - stream.compute.xlarge
+      - stream.compute.2xlarge
+      - stream.compute.4xlarge
+      - stream.compute.8xlarge
+      - stream.memory.large
+      - stream.memory.xlarge
+      - stream.memory.2xlarge
+      - stream.memory.4xlarge
+      - stream.memory.8xlarge
+      - stream.memory.z1d.large
+      - stream.memory.z1d.xlarge
+      - stream.memory.z1d.2xlarge
+      - stream.memory.z1d.3xlarge
+      - stream.memory.z1d.6xlarge
+      - stream.memory.z1d.12xlarge
+      - stream.graphics-design.large
+      - stream.graphics-design.xlarge
+      - stream.graphics-design.2xlarge
+      - stream.graphics-design.4xlarge
+      - stream.graphics-desktop.2xlarge
+      - stream.graphics-pro.4xlarge
+      - stream.graphics-pro.8xlarge
+      - stream.graphics-pro.16xlarge
+
+  DesiredFleetInstances:
+    Description: The Desired Compute Capacity for the Fleet
+    Type: Number
+    Default: 2
+
+  FleetTypeSetting:
+    Description: Whether the AppStream fleet will be always-on or on-demand
+    Type: String
+    Default: ON_DEMAND
+    AllowedValues:
+      - ON_DEMAND
+      - ALWAYS_ON
+
+  SessionRedirectURL:
+    Description: The URL that users are redirected to after their streaming session ends
+    Type: String
+    Default: http://www.amazon.com
+
+  # # As an alternative, you can specify the ARN of the base image instead of
+  # # the friendly name.  You must do one or the other, but not both.
+  # ImageBuilderBaseImage:
+  #   Description: The ARN of the public, private, or shared image to use
+  #   Type: String
+  #   AllowedPattern: ^arn:aws(?:\-cn|\-iso\-b|\-iso|\-us\-gov)?:[A-Za-z0-9][A-Za-z0-9_/.-]{0,62}:[A-Za-z0-9_/.-]{0,63}:[A-Za-z0-9_/.-]{0,63}:[A-Za-z0-9][A-Za-z0-9:_/+=,@.\\-]{0,1023}$
+
+  # ImageBuilderBaseImageName:
+  #   Description: The name of the image used to create the image builder. Available base image listing is found on docs.aws.amazon.com/appstream2/latest/developerguide/base-image-version-history.html
+  #   Type: String
+  #   Default: AppStream-WinServer2019-12-12-2019
+  #   MinLength: 1
+
+  # Just like the base image for the image builder, you can specify the image
+  # for the fleet using either the name or the ARN.
+  FleetImageName:
+    Description: The name of the image used for the fleet. This can be changed without service interruption once the Image Builder has been used.
+    Type: String
+    Default: AppStream-WinServer2019-12-12-2019
+    MinLength: 1
+
+  # Email address for the test user account
+  TestUserEmail:
+    Description: Email address for the test user
+    Type: String
+    MinLength: 5
+    AllowedPattern: ^([a-zA-Z0-9_\-\.\+]+)@([a-zA-Z0-9_\-\.]+)\.([a-zA-Z]{2,5})$
+    ConstraintDescription: Must be a valid email address format.
+
+#
+# Define AWS resources to deploy
+#
+Resources:
+
+  # S3 bucket for storing software installation images
+  SoftwareS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref SoftwareS3BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Suspended
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  # IAM Role for AppStream 2.0 to use for accessing S3 Bucket of installers
+  S3AccessRole:
+    Type: AWS::IAM::Role
+    DependsOn: SoftwareS3Bucket
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - appstream.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: SoftwareS3BucketRead
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                - s3:Get*
+                - s3:List*
+                Resource: !Sub 'arn:aws:s3:::${SoftwareS3Bucket}'
+      Description: IAM Role for AppStream 2.0 to access S3 bucket of software installers
+
+  # Virtual private cloud and associated IGW, subnets, and NAT Gateway
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone:
+        Fn::Select:
+          - 0
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone:
+        Fn::Select:
+          - 1
+          - Fn::GetAZs: ""
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes (AZ2)
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  NoIngressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "no-ingress-sg"
+      GroupDescription: "Security group with no ingress rule"
+      VpcId: !Ref VPC
+
+# # Define AppStream 2.0 Resources for image builder, fleet and stack
+#   ImageBuilder:
+#     Type: AWS::AppStream::ImageBuilder
+#     Properties:
+#       Description: ImageBuilder instance for AS20 stack
+#       DisplayName: ImageBuilder_Standard_Large
+#       ImageName: !Ref ImageBuilderBaseImageName
+#       InstanceType: !Ref FleetInstanceType
+#       Name: !Join
+#         - ''
+#         - - !Ref EnvironmentName
+#           - ImageBuilder
+#       Tags:
+#         - Key: StandardPlay
+#           Value: AppStream
+#       VpcConfig:
+#         SecurityGroupIds:
+#           - !Ref NoIngressSecurityGroup
+#         SubnetIds:
+#           - !Ref PrivateSubnet1
+
+# Fleet is first created with a default "Blank" image unless the Image Builder
+# has been used to create a "golden" image.  This template parameter can be
+# updated after the Image Builder has been used
+  MyFleet:
+    Type: AWS::AppStream::Fleet
+    Properties:
+      ComputeCapacity:
+        DesiredInstances: !Ref DesiredFleetInstances
+      Description: AppStream 2.0 Fleet for Standard Play stack
+      DisplayName: Fleet_Standard_Play
+      Name: !Join
+        - ''
+        - - !Ref EnvironmentName
+          - Fleet
+      EnableDefaultInternetAccess: false
+      FleetType: !Ref FleetTypeSetting
+      InstanceType: !Ref FleetInstanceType
+      ImageName: !Ref FleetImageName
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref NoIngressSecurityGroup
+        SubnetIds:
+          - !Ref PrivateSubnet1
+          - !Ref PrivateSubnet2
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+# Application stack to present to user
+  MyStack:
+    Type: AWS::AppStream::Stack
+    Properties:
+      ApplicationSettings:
+        Enabled: true
+        SettingsGroup: AppStreamEUCSettings
+      Description: AppStream 2.0 Stack for Standard Play
+      DisplayName: !Ref EnvironmentName
+      Name: !Join
+        - ''
+        - - !Ref EnvironmentName
+          - Stack
+      RedirectURL: !Ref SessionRedirectURL
+      Tags:
+        - Key: AppStreamEnvironment
+          Value: !Ref EnvironmentName
+
+# Associate the stack with the fleet
+  StackFleetAssociation:
+    Type: AWS::AppStream::StackFleetAssociation
+    Properties:
+      FleetName: !Ref MyFleet
+      StackName: !Ref MyStack
+
+# Create a test user in the AppStream 2.0 User Pool
+  TestUser:
+    Type: AWS::AppStream::User
+    Properties:
+      AuthenticationType: USERPOOL
+      FirstName: Test
+      LastName: User
+      UserName: !Ref TestUserEmail
+
+# Associate the test user with the Stack and send the invite email
+  TestUserStackAssociation:
+    Type: AWS::AppStream::StackUserAssociation
+    DependsOn: TestUser
+    Properties:
+      AuthenticationType: USERPOOL
+      SendEmailNotification: true
+      StackName: !Ref MyStack
+      UserName: !Ref TestUserEmail
+
+# Notable data points post-stack-creation for use elsewhere (such as stacksets)
+Outputs:
+
+  VPC:
+    Description: VPC for fleet instances and NAT Gateways
+    Value: !Ref VPC
+
+  PublicSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+
+  PrivateSubnet1:
+    Description: A reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+
+  PrivateSubnet2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+
+  TestUserEmailAddress:
+    Description: Email address of the CFN Template-created user in the AppStream user pool
+    Value: !Ref TestUserEmail
