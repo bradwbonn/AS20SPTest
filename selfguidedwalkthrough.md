@@ -261,7 +261,9 @@ You will see an area appear below which will allow you to upload your logo, add 
 You can log in as your test user again after refreshing the browser, and you should now see your chosen branding on the AppStream 2.0 page.
 
 ## Adding production users to your stack with User Pools
-#### AppStream 2.0 User Pools can accommodate up to 50 users by default. This quota can be increased by opening a support ticket, however for deployments involving 100 users or more, it is highly recommended to implement SAML 2.0 authentication to an external identity provider (IdP) for user management.  **For setting up SAML 2.0 federation, skip the step outlined below and follow the directions [in this guide](https://docs.aws.amazon.com/appstream2/latest/developerguide/external-identity-providers-setting-up-saml.html) for the specific identity provider you are using.**
+#### AppStream 2.0 User Pools can accommodate up to 50 users by default. This quota can be increased by opening a support ticket, however for deployments involving 100 users or more, it is highly recommended to implement SAML 2.0 authentication to an external identity provider (IdP) for user management.
+
+> **Note:** For setting up SAML 2.0 federation, skip the step outlined below and follow the directions [in this guide](https://docs.aws.amazon.com/appstream2/latest/developerguide/external-identity-providers-setting-up-saml.html) for the specific identity provider you are using.
 
 Your first user was created for you by the CloudFormation template, but now you will need to add additional users to your pool so they can stream your application(s).  This is done in the AppStream 2.0 console under **User Pool**.  
 
