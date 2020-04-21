@@ -48,13 +48,17 @@ Additional networking for file gateways (stateful)
 Additional networking for volume and tape gateways (stateful)
 * iSCSI (in and out from local network)
 
-### Setup process
-#### [File Gateway](https://docs.aws.amazon.com/storagegateway/latest/userguide/create-file-gateway.html)
-#### [Volume Gateway](https://docs.aws.amazon.com/storagegateway/latest/userguide/create-volume-gateway-volume.html)
-#### [Tape Gateway](https://docs.aws.amazon.com/storagegateway/latest/userguide/create-tape-gateway.html)
+## Setup process
+Each of the following links will guide you through the process of initial setup for each gateway type.  Choose from one below, then follow the associated post-deployment steps laid out in the next group of links.
+#### [File Gateway Setup](https://docs.aws.amazon.com/storagegateway/latest/userguide/create-file-gateway.html)
+#### [Volume Gateway Setup](https://docs.aws.amazon.com/storagegateway/latest/userguide/create-volume-gateway-volume.html)
+#### [Tape Gateway Setup](https://docs.aws.amazon.com/storagegateway/latest/userguide/create-tape-gateway.html)
 
-### Post-deployment
-#### [Monitoring](https://docs.aws.amazon.com/storagegateway/latest/userguide/Main_monitoring-gateways-common.html)
+### Post-deployment configuration
+Depending upon the type of gateway you have configured, follow the appropriate post-deployment configuration steps to connect users, configure authentication, configure local storage, and create storage entities.
 #### [File Gateway Management](https://docs.aws.amazon.com/storagegateway/latest/userguide/managing-gateway-file.html)
 #### [Volume Gateway Management](https://docs.aws.amazon.com/storagegateway/latest/userguide/managing-volumes.html)
 #### [Tape Gateway Management](https://docs.aws.amazon.com/storagegateway/latest/userguide/managing-gateway-vtl.html)
+
+Finally, for all gateway types, set up CloudWatch against your gateway and associated AWS resources in order to closely monitor utilization and alerting.
+#### [Storage Gateway Monitoring](https://docs.aws.amazon.com/storagegateway/latest/userguide/Main_monitoring-gateways-common.html)
