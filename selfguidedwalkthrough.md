@@ -1,5 +1,7 @@
-# Amazon AppStream 2.0 EUC Self-Paced Setup Guide
-### When utilizing remote end user compute solutions, users need to have a consistent application experience regardless of their location, as well as secure access to enterprise resources through a single sign-on portal.  AWS AppStream 2.0 provides the resources necessary to build, deploy, and stream secure user-installed applications at scale.  All compute, storage, and configurations remain inside the private account environment within AWS, enabling robust security by default.
+# Amazon AppStream 2.0 Student Lab EUC Self-Paced Setup Guide
+### When utilizing remote end user compute solutions, users need to have a consistent application experience regardless of their location, as well as secure access to enterprise resources through a single sign-on portal.  AppStream 2.0 provides the resources necessary to build, deploy, and stream secure user-installed applications at scale.  All compute, storage, and configurations remain inside the private account environment within AWS, enabling robust security by default.
+
+### This walkthrough will guide you through the technical implementation steps required for deploying an AppStream 2.0 Stack and Fleet, as well as how to build your custom application image for deployment to said fleet.
 
 ## Getting Started
 The core components of an AppStream 2.0 deployment consist of the fleet of compute instances that host the Windows OS and application environments, the user-created "golden" images, and finally the stack, which brings together the aforementioned components and presents them to users via a single sign-on access portal.
@@ -9,9 +11,14 @@ AppStream 2.0 stacks can be joined to Microsoft Active Directory domains and can
 Regardless of Active Directory domain membership, however, AppStream 2.0 can also federate logins using SAML 2.0 in order to integrate with existing identity providers (IdPs).  While each IdP will have a different overall methodology for integrating into AppStream 2.0, this self-paced guide will provide the necessary common steps for getting this process started, as well as referencing the specific step-by-step instructions for various IdPs.
 
 ## Pre-requisites
+This courtesy on-board material set includes a Microsoft Word document titled **Getting Started Prerequisites for Amazon AppStream 2**.  This document contains the checklists and processes which should be followed for determining important items pre-deployment, such as:
+
+  * Number of concurrent client sessions
+  * Instance type for streaming
+  * Whether or not IdP integration will be required
 
 ### AWS account
-You will need to have created an AWS account for yourself, or have one provided to you for the purpose of the deployment where you have been provided IAM Administrator permissions.  We recommend that you create an IAM user with administrator permissions inside the account for creating and managing resources, rather than using the root user login.
+You will need to have created an AWS account for yourself, or have one provided to you for the purpose of the deployment where you have been provided IAM Administrator permissions.  It is recommended to use a dedicated AWS account for the EUC standard play, if possible.  It is also recommended that you create an IAM user with administrator permissions inside the account for creating and managing resources, rather than using the root user login for any deployment or management within that account.  [For more helpful AWS Account security best practices, click here.](https://aws.amazon.com/blogs/security/getting-started-follow-security-best-practices-as-you-configure-your-aws-resources/)
 
 ### Network requirements
 Your users will need outbound TCP ports open for the NICE DCV protocol:
@@ -93,7 +100,7 @@ Click on “View nested” to un-select the option.
 
 The Stack will have the status of **CREATE IN PROGRESS.**
 
->The AWS CloudFormation template will take about 15-20 minutes to complete. The AWS CloudFormation template is now provisioning resources such as the VPC, subnets, Internet Gateways, NAT gateways, routing tables, S3 buckets, and AppStream 2.0 fleet, stack, and IAM role.
+>**Note:** The AWS CloudFormation template will take about 15-20 minutes to complete. The AWS CloudFormation template is now provisioning resources such as the VPC, subnets, Internet Gateways, NAT gateways, routing tables, S3 buckets, and AppStream 2.0 fleet, stack, and IAM role.
 Once complete, the stack will show in the list with a status of "UPDATE_COMPLETE" with a green check mark.  This indicates that your resources have all been deployed, and you can move on to the next step.
 
 ## Building your application's "golden image" via the image builder
@@ -131,6 +138,16 @@ This step will vary depending upon the application itself that you're deploying 
 If an application requires the Windows operating system to restart, let it do so. Before the operating system restarts, you are disconnected from your image builder. After the restart is complete, connect to the image builder again, then finish installing the application.
 
 ## Use image assistant to create the AppStream 2.0 image from the image builder
+The following steps will guide you through the process of generically deploying a new application for streaming via your AppStream 2.0 fleet.  In addition to the guide below, AWS has prescriptive app-specific guidance for deploying many commonly-distributed applications via AppStream 2.0 such as:
+
+* [SAP GUI](https://d1.awsstatic.com/product-marketing/AppStream2.0/Amazon%20AppStream%202.0%20SAP%20GUI%20Deployment%20Guide.pdf)
+* [Solidworks](https://d1.awsstatic.com/product-marketing/AppStream2.0/Amazon%20AppStream%202.0%20SOLIDWORKS%20Deployment%20Guide.pdf)
+* [Siemens NX](https://d1.awsstatic.com/product-marketing/AppStream2.0/AppStream%202.0%20Siemens%20NX%20Deployment%20Guide.pdf)
+* [MATLAB](https://d1.awsstatic.com/product-marketing/AppStream2.0/AppStream2-MatLab-Deployment-Guide.pdf)
+* [Topaz on AWS](http://frontline.compuware.com/doc/KB/KBTAWS/readme.html)
+* [ArcGIS Pro](https://d1.awsstatic.com/product-marketing/AppStream2.0/AppStream2-ESRI-ArcGISPro-Deployment-Guide-Feb.pdf)
+* [AutoCAD](https://d1.awsstatic.com/end-user-computing/AppStream2-AutoCAD-Deployment-Guide-new.pdf)
+
 ### Build the application catalog
 #### In this step, create an AppStream 2.0 application catalog by specifying applications (.exe), batch scripts (.bat), and application shortcuts (.lnk) for your image. For each application that you plan to stream, you can specify the name, display name, executable file to launch, and icon to display. If you choose an application shortcut, these values are prepopulated for you.
 > **Important:** In order to complete this step, you must be logged into the Image Builder as an account that has local Administrator rights.
